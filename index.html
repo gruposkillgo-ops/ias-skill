@@ -125,6 +125,13 @@ h3{font-size:14px;font-weight:600}
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--ground);padding-block:14px 0;border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
 .brand .mark{display:flex;align-items:center;gap:10px}
+.modsw{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin-top:14px}
+.modsw-l{align-self:center;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint,#7a867f);margin-right:4px}
+.modsw button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 14px;border:1px solid var(--line);border-radius:10px;background:transparent;cursor:pointer;text-align:left;line-height:1.2}
+.modsw button b{font-size:14px;font-weight:600}
+.modsw button span{font-size:11px;color:var(--faint,#7a867f)}
+.modsw button[aria-selected="true"]{border-color:var(--accent,#0B6A4F);background:color-mix(in srgb,var(--accent,#0B6A4F) 9%,transparent);box-shadow:inset 0 0 0 1px var(--accent,#0B6A4F)}
+.modsw button[aria-selected="true"] b{color:var(--accent,#0B6A4F)}
 .seal{width:34px;height:34px;border:2px solid var(--stamp);border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-size:10px;font-weight:500;color:var(--stamp);letter-spacing:.02em}
 .company{font-size:12px;color:var(--ink2);text-align:right}
 nav.tabs{display:flex;gap:2px;margin-top:12px;overflow-x:auto;scrollbar-width:none}
@@ -205,13 +212,18 @@ details summary{cursor:pointer;color:var(--ink2)}
 <header class="top">
   <div class="brand">
     <div class="mark">
-      <div class="seal" aria-hidden="true">ST</div>
+      <div class="seal" aria-hidden="true" id="modSeal">ST</div>
       <div>
-        <h1>Apurador ICMS-ST</h1>
+        <h1 id="modTit">Apurador ICMS-ST</h1>
         <div class="faint" style="font-size:12px" id="subTit">XML da NF-e → cálculo com base legal → guia SEFAZ e memória em PDF</div>
       </div>
     </div>
     <div><div class="company" id="companyLine">Empresa não configurada</div><div class="company" id="dbStatus" style="font-size:11px">● conectando…</div></div>
+  </div>
+  <div class="modsw" role="tablist" aria-label="Módulos" id="modSw">
+    <span class="modsw-l">Módulos</span>
+    <button role="tab" data-mod="icms" aria-selected="true"><b>ICMS</b><span>ST e antecipação</span></button>
+    <button role="tab" data-mod="cbs" aria-selected="false"><b>Crédito CBS</b><span>Reforma tributária</span></button>
   </div>
   <nav class="tabs" role="tablist" id="tabs">
     <button role="tab" data-tab="notas" aria-selected="true">Notas<span class="count" id="cNotas">0</span></button>
@@ -220,7 +232,9 @@ details summary{cursor:pointer;color:var(--ink2)}
     <button role="tab" data-tab="relatorios" aria-selected="false" class="only-ba" hidden>Relatórios</button>
     <button role="tab" data-tab="regras" aria-selected="false"><span id="lblRegras">Regras MVA</span><span class="count" id="cRegras">0</span></button>
     <button role="tab" data-tab="consulta" aria-selected="false">Consulta NCM</button>
-    <button role="tab" data-tab="cbs" aria-selected="false">Crédito CBS<span class="count" id="cCbs"></span></button>
+    <button role="tab" data-tab="cbs" aria-selected="false" data-m="cbs" hidden>Estoque 01/01/2027<span class="count" id="cCbs"></span></button>
+    <button role="tab" data-tab="cbsq" aria-selected="false" data-m="cbs" hidden>Consulta de elegibilidade</button>
+    <button role="tab" data-tab="cbslei" aria-selected="false" data-m="cbs" hidden>Base legal CBS</button>
     <button role="tab" data-tab="base" aria-selected="false">Base legal<span class="count" id="cBase">…</span></button>
     <button role="tab" data-tab="historico" aria-selected="false">Histórico<span class="count" id="cHist">0</span></button>
     <button role="tab" data-tab="config" aria-selected="false">Empresa</button>
@@ -376,8 +390,11 @@ details summary{cursor:pointer;color:var(--ink2)}
       </div>
     </div>
     <div class="panel"><div class="panel-h"><h2>Validação do estoque</h2></div><div class="panel-b" id="cbsBody" style="display:grid;gap:14px"></div></div>
+  </section>
+
+  <section data-view="cbsq" hidden style="display:grid;gap:18px">
     <div class="panel">
-      <div class="panel-h"><div><h2>Consulta rápida: este item é elegível?</h2><div class="muted" style="font-size:13px">Usa o regime informado acima.</div></div></div>
+      <div class="panel-h"><div><h2>Este item dá crédito presumido de CBS?</h2><div class="muted" style="font-size:13px">Usa o regime de PIS/Cofins informado para a empresa (aba Estoque ou Empresa): <b id="cbsQReg">—</b></div></div></div>
       <div class="panel-b" style="display:grid;gap:12px">
         <div class="grid-form">
           <label class="field"><span class="label">NCM</span><input id="cbsQNcm" placeholder="84339090"></label>
@@ -390,7 +407,10 @@ details summary{cursor:pointer;color:var(--ink2)}
       </div>
     </div>
   </section>
-
+  <section data-view="cbslei" hidden style="display:grid;gap:18px">
+    <div class="panel"><div class="panel-h"><div><h2>Base legal — crédito presumido de CBS sobre estoque</h2><div class="muted" style="font-size:13px">LC 214/2025 (transição PIS/Cofins → CBS) e listas de incidência monofásica usadas na validação</div></div></div>
+      <div class="panel-b" id="cbsLeiBody" style="display:grid;gap:12px"></div></div>
+  </section>
   <section data-view="base" hidden style="display:grid;gap:18px">
     <div class="panel">
       <div class="panel-h"><div><h2>Base legal ICMS-ST · Mato Grosso</h2><div class="muted" style="font-size:13px" id="baseMeta">Carregando…</div></div></div>
@@ -673,7 +693,7 @@ function renderAll(){
   $("#cRegras").textContent=rulesAtivas().length;
   $("#cHist").textContent=Object.keys(hist).length;
   $("#btnClear").hidden=!calc.length; $("#btnClear").textContent=isBA()&&apurAtiva()?"Limpar notas da apuração":"Limpar notas";
-  if(isBA()){renderApurBar(calc,guides);renderPendBA(calc);renderNotes(calc);renderCalcBA(calc);renderGuidesBA(guides);renderRel()}else{renderPend(calc); renderNotes(calc); renderCalc(calc); renderGuides(guides);} renderRules(); renderHist(); applyGate(); if(tab==="cbs")renderCBS();
+  if(isBA()){renderApurBar(calc,guides);renderPendBA(calc);renderNotes(calc);renderCalcBA(calc);renderGuidesBA(guides);renderRel()}else{renderPend(calc); renderNotes(calc); renderCalc(calc); renderGuides(guides);} renderRules(); renderHist(); applyGate(); if(tab==="cbs")renderCBS(); if(typeof aplicarModulo==="function")aplicarModulo();
 }
 document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g)setTab(g.dataset.go)});
 
@@ -1632,7 +1652,7 @@ function renderEmpSel(){
   const el=$("#companyLine"); if(!el) return;
   const ids=Object.keys(empresas); if(!ids.includes(empId)) ids.unshift(empId);
   const nm=id=>{const e=id===empId?cfg:{...(id==="empresa"?DEFAULT_CFG:{}),...empresas[id]};return (e.razao||"Nova empresa").split(" ").slice(0,3).join(" ")+" · "+(e.uf||"?")};
-  el.innerHTML=`<label class="label" for="empSel" style="display:block">Empresa</label><select id="empSel" style="max-width:280px">${ids.map(id=>`<option value="${esc(id)}" ${id===empId?"selected":""}>${esc(nm(id))}</option>`).join("")}</select><br><span class="mono">${esc(fmtCnpj(cfg.cnpj))}</span> · ${isBA()?"antecipação parcial":"ICMS-ST"}`;
+  el.innerHTML=`<label class="label" for="empSel" style="display:block">Empresa</label><select id="empSel" style="max-width:280px">${ids.map(id=>`<option value="${esc(id)}" ${id===empId?"selected":""}>${esc(nm(id))}</option>`).join("")}</select><br><span class="mono">${esc(fmtCnpj(cfg.cnpj))}</span> · ${typeof modAtual!=="undefined"&&modAtual==="cbs"?(cfg.regimePisCofins==="cumulativo"?"Lucro Presumido":cfg.regimePisCofins==="nao_cumulativo"?"Lucro Real":cfg.regimePisCofins==="simples"?"Simples":"regime PIS/Cofins não informado"):(isBA()?"antecipação parcial":"ICMS-ST")}`;
 }
 document.addEventListener("change",e=>{ if(e.target.id!=="empSel") return; empId=e.target.value; applyEmp(); const s=$("#baseSeg"); if(s){s.dataset.mode="";s.innerHTML='<option value="">Todos os segmentos</option>'} renderCfg(); renderAll(); renderBase(); toast("Empresa: "+(cfg.razao||empId)) });
 async function novaEmpresa(){ const id="empresa-"+Date.now().toString(36); empresas[id]={...BLANK_CFG,razao:"NOVA EMPRESA"}; empId=id; applyEmp(); lsSet("st_empresas",empresas);
@@ -1885,12 +1905,38 @@ function cbsInit(){
 }
 cbsInit();
 
+
+/* ---------- módulos da ferramenta ---------- */
+const MODULOS={
+  icms:{nome:"Apurador ICMS-ST",selo:"ST",tabs:["notas","calculo","guias","relatorios","regras","consulta","base","historico","config"],inicio:"notas"},
+  cbs:{nome:"Crédito CBS",selo:"CBS",tabs:["cbs","cbsq","cbslei","config"],inicio:"cbs",sub:"Reforma tributária · crédito presumido de CBS sobre o estoque em 01/01/2027 (LC 214/2025, art. 381)"}
+};
+let modAtual=(()=>{try{const u=new URLSearchParams(location.search).get("mod");if(u&&MODULOS[u])return u}catch(e){}return lsGet("st_mod","icms")})();
+if(!MODULOS[modAtual])modAtual="icms";
+function aplicarModulo(){
+  const M=MODULOS[modAtual];
+  $$("#modSw button[data-mod]").forEach(b=>b.setAttribute("aria-selected",b.dataset.mod===modAtual)); renderEmpSel();
+  $("#modTit").textContent=M.nome; $("#modSeal").textContent=M.selo; document.title=M.nome+(modAtual==="icms"?"":" · Apurador");
+  $("#subTit").textContent=M.sub||(isBA()?"XML da NF-e → antecipação parcial com base legal → DAE SEFAZ-BA, relatórios e memória em PDF":"XML da NF-e → cálculo com base legal → DAR SEFAZ-MT e memória em PDF");
+  $$("#tabs button[data-tab]").forEach(b=>{const t=b.dataset.tab;let vis=M.tabs.includes(t);if(t==="relatorios"&&!isBA())vis=false;b.hidden=!vis});
+  if(!M.tabs.includes(tab)||(tab==="relatorios"&&!isBA())) setTab(M.inicio);
+  const ab=$("#apurBar"); if(ab&&modAtual!=="icms") ab.hidden=true;
+  if(modAtual==="cbs"){ if(tab==="cbs")renderCBS(); if(tab==="cbsq"){cbsConsulta();const r=$("#cbsQReg");if(r)r.textContent=CBS_REG[cbsRegime()]||"não informado"} if(tab==="cbslei")renderCbsLei(); }
+}
+function trocarModulo(m){ if(!MODULOS[m])return; modAtual=m; lsSet("st_mod",m); aplicarModulo(); setTab(MODULOS[m].inicio); aplicarModulo(); }
+$("#modSw").addEventListener("click",e=>{const b=e.target.closest("button[data-mod]");if(b)trocarModulo(b.dataset.mod)});
+$("#tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b&&modAtual==="cbs")setTimeout(aplicarModulo,0)});
+function renderCbsLei(){const h=$("#cbsLeiBody");if(!h||h.dataset.ok)return;h.dataset.ok=1;
+  h.innerHTML=Object.entries(CBS_LEI).map(([k,t])=>`<div class="note-card"><div style="font-size:13px">${esc(t)}</div></div>`).join("")+
+  `<h3 style="margin:8px 0 0">Listas de incidência monofásica (art. 381, II)</h3>`+CBS_MONO.map(g=>`<div class="note-card"><div><b>${esc(g.lei)}</b><div class="mono" style="font-size:12px;margin-top:4px;word-break:break-word">${g.ncm.map(n=>n+(g.ex&&g.ex[n]?" ("+g.ex[n]+")":"")).join(" · ")}</div>${g.anexo2?`<div class="muted" style="font-size:12px;margin-top:4px">Só quando a peça é própria para máquina/veículo autopropulsado listado no Anexo II.</div>`:""}</div></div>`).join("")+
+  `<div class="callout info" style="font-size:13px">Fontes: LC 214/2025 e Lei 10.485/2002, texto vigente no Planalto (consultado em 16/11/2026). A forma de verificação do estoque depende de ato do Poder Executivo (art. 381, § 2º).</div>`}
 /* boot */
 {if(!/^\d{4}-\d{2}$/.test(apur)){const d=new Date();apur=shiftMes(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),-1);} $("#apurSel").value=apur; $("#apurAll").checked=apurTodas;}
 hist=lsGet("st_hist",{});
 renderCfg();
 sortNotes(); renderAll();
 try{const t=localStorage.getItem("st_tab");if(t)setTab(t)}catch(e){}
+aplicarModulo();
 initDb();
 loadBase();
 loadBaseBA();
