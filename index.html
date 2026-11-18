@@ -220,6 +220,7 @@ details summary{cursor:pointer;color:var(--ink2)}
     <button role="tab" data-tab="relatorios" aria-selected="false" class="only-ba" hidden>Relatórios</button>
     <button role="tab" data-tab="regras" aria-selected="false"><span id="lblRegras">Regras MVA</span><span class="count" id="cRegras">0</span></button>
     <button role="tab" data-tab="consulta" aria-selected="false">Consulta NCM</button>
+    <button role="tab" data-tab="cbs" aria-selected="false">Crédito CBS<span class="count" id="cCbs"></span></button>
     <button role="tab" data-tab="base" aria-selected="false">Base legal<span class="count" id="cBase">…</span></button>
     <button role="tab" data-tab="historico" aria-selected="false">Histórico<span class="count" id="cHist">0</span></button>
     <button role="tab" data-tab="config" aria-selected="false">Empresa</button>
@@ -352,6 +353,42 @@ details summary{cursor:pointer;color:var(--ink2)}
     </div>
     <div class="panel" id="localRes" hidden><div class="panel-h"><h2>Regras compatíveis</h2><span class="muted" id="localHint"></span></div><div id="localList"></div></div>
     <div class="panel" id="aiRes" hidden><div class="panel-h"><h2>Análise do Claude</h2><span id="aiConf"></span></div><div class="panel-b" id="aiBody"></div></div>
+  </section>
+
+  <!-- CRÉDITO CBS -->
+  <section data-view="cbs" hidden style="display:grid;gap:18px">
+    <div class="panel">
+      <div class="panel-h"><div><h2>Crédito presumido de CBS sobre o estoque</h2><div class="muted" style="font-size:13px">Transição PIS/Cofins → CBS · LC 214/2025, art. 381 · estoque existente em 1º/01/2027 · 9,25% do valor · 12 parcelas só contra a CBS</div></div><div id="cbsStatus"></div></div>
+      <div class="panel-b" style="display:grid;gap:14px">
+        <div class="grid-form">
+          <label class="field"><span class="label">Regime de PIS/Cofins da empresa em 31/12/2026</span><select id="cbsReg"><option value="">— informe —</option><option value="nao_cumulativo">Lucro Real — não cumulativo</option><option value="cumulativo">Lucro Presumido/Arbitrado — cumulativo</option><option value="simples">Simples Nacional</option></select></label>
+          <label class="field"><span class="label">Mês da apropriação (até 06/2027)</span><input type="month" id="cbsAprop" min="2027-01" max="2027-06" value="2027-06"></label>
+        </div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <label class="btn" for="cbsInvIn">1. Importar estoque de 31/12/2026 (Excel/CSV do ERP)</label><input type="file" id="cbsInvIn" accept=".xlsx,.xls,.csv" hidden>
+          <label class="btn ghost" for="cbsXmlIn">2. Adicionar XMLs de compra</label><input type="file" id="cbsXmlIn" accept=".xml,text/xml" multiple hidden>
+          <button class="ghost" id="cbsSync">Reler XMLs já importados no sistema</button>
+          <button class="ghost" id="cbsModelo">Baixar modelo da planilha</button>
+          <button class="ghost danger" id="cbsLimpar">Remover inventário</button>
+        </div>
+        <div id="cbsMap" hidden style="display:grid;gap:10px"></div>
+        <div class="callout info" style="font-size:13px">Cada item do estoque é ligado à NF de compra (por EAN, código do fornecedor, código ou NCM + descrição). A regra usa o regime da empresa, o CST de PIS/Cofins da NF de compra e as listas monofásicas (Lei 10.485/2002 — máquinas, implementos, autopeças e pneus; Lei 10.147/2000). Itens em <b>Conferir</b> não entram no total até alguém confirmar. A forma oficial de verificar o estoque ainda depende de ato do Poder Executivo (art. 381, § 2º).</div>
+      </div>
+    </div>
+    <div class="panel"><div class="panel-h"><h2>Validação do estoque</h2></div><div class="panel-b" id="cbsBody" style="display:grid;gap:14px"></div></div>
+    <div class="panel">
+      <div class="panel-h"><div><h2>Consulta rápida: este item é elegível?</h2><div class="muted" style="font-size:13px">Usa o regime informado acima.</div></div></div>
+      <div class="panel-b" style="display:grid;gap:12px">
+        <div class="grid-form">
+          <label class="field"><span class="label">NCM</span><input id="cbsQNcm" placeholder="84339090"></label>
+          <label class="field"><span class="label">CST PIS/Cofins na NF de compra</span><select id="cbsQCst"><option value="">não sei / sem NF</option><option value="01">01 — tributada normal</option><option value="02">02 — monofásica (fabricante/importador)</option><option value="04">04 — monofásica revenda alíquota zero</option><option value="05">05 — substituição tributária</option><option value="06">06 — alíquota zero</option><option value="07">07 — isenta</option><option value="08">08 — sem incidência</option><option value="09">09 — suspensão</option><option value="49">49 — outras saídas</option></select></label>
+          <label class="field"><span class="label">Fornecedor</span><select id="cbsQForn"><option value="pj">Pessoa jurídica no Brasil</option><option value="cpf">Pessoa física</option><option value="imp">Importação própria</option></select></label>
+          <label class="field"><span class="label">Destinação</span><select id="cbsQDest"><option value="revenda">Revenda</option><option value="insumo">Insumo de produção/serviço</option><option value="uso e consumo">Uso e consumo</option><option value="imobilizado">Ativo imobilizado</option></select></label>
+          <label class="field"><span class="label">Situação</span><select id="cbsQSit"><option value="novo">Novo</option><option value="usado">Usado</option></select></label>
+        </div>
+        <div id="cbsQRes"></div>
+      </div>
+    </div>
   </section>
 
   <section data-view="base" hidden style="display:grid;gap:18px">
@@ -636,7 +673,7 @@ function renderAll(){
   $("#cRegras").textContent=rulesAtivas().length;
   $("#cHist").textContent=Object.keys(hist).length;
   $("#btnClear").hidden=!calc.length; $("#btnClear").textContent=isBA()&&apurAtiva()?"Limpar notas da apuração":"Limpar notas";
-  if(isBA()){renderApurBar(calc,guides);renderPendBA(calc);renderNotes(calc);renderCalcBA(calc);renderGuidesBA(guides);renderRel()}else{renderPend(calc); renderNotes(calc); renderCalc(calc); renderGuides(guides);} renderRules(); renderHist(); applyGate();
+  if(isBA()){renderApurBar(calc,guides);renderPendBA(calc);renderNotes(calc);renderCalcBA(calc);renderGuidesBA(guides);renderRel()}else{renderPend(calc); renderNotes(calc); renderCalc(calc); renderGuides(guides);} renderRules(); renderHist(); applyGate(); if(tab==="cbs")renderCBS();
 }
 document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g)setTab(g.dataset.go)});
 
@@ -945,7 +982,7 @@ function renderHist(){
 const CFG_FIELDS=[["modulo","Tipo de apuração","modulo"],["responsavel","Responsável pela memória de cálculo (PDF)"],["razao","Razão social"],["cnpj","CNPJ"],["ie","Inscrição estadual"],["uf","UF","uf"],["endereco","Endereço"],["bairro","Bairro"],["municipio","Município"],["cep","CEP"],["fone","Telefone"],
   ["receitaLocal","Receita DAR (UF própria) — ICMS-ST entradas"],["receitaLocalFCP","Receita DAR (UF própria) — FCP"],["portalLocal","Portal SEFAZ da UF própria"],["codMunSefaz","Cód. município SEFAZ (DAR campo 20)"],["conv5291ok","NCMs confirmados no Conv. 52/91 (separe por vírgula)"],["filiais","Filiais: CNPJ=cód. município SEFAZ (separe por ;)"],
   ["receitaST","Receita GNRE — ICMS-ST"],["receitaFCP","Receita GNRE — FCP-ST"],["tipoDoc","Tipo doc. origem (portal)"],["fcpSeparado","FCP em guia separada","bool"],
-  ["regimeMVA","Regime de MVA (Portaria 195/2019)","regime"],["ipiNaBase","IPI compõe a base ST","bool"],["freteNaBase","Frete compõe a base ST","bool"],["vencRegra","Vencimento","venc"],["diaVenc","Dia (mês seguinte)"],["aliqPadrao","Alíquota interna padrão % (antecipação parcial BA)"]];
+  ["regimeMVA","Regime de MVA (Portaria 195/2019)","regime"],["ipiNaBase","IPI compõe a base ST","bool"],["freteNaBase","Frete compõe a base ST","bool"],["vencRegra","Vencimento","venc"],["diaVenc","Dia (mês seguinte)"],["aliqPadrao","Alíquota interna padrão % (antecipação parcial BA)"],["regimePisCofins","Regime PIS/Cofins em 31/12/2026 (crédito CBS)","pisreg"]];
 function renderCfg(){
   const f=$("#cfgForm"); if(f.contains(document.activeElement))return;
   f.innerHTML=CFG_FIELDS.map(([k,l,t])=>{
@@ -954,6 +991,7 @@ function renderCfg(){
     if(t==="uf")return `<label class="field"><span class="label">${l}</span><select id="${id}" data-c="${k}"><option value="">—</option>${UFS.map(u=>`<option ${cfg[k]===u?"selected":""}>${u}</option>`).join("")}</select></label>`;
     if(t==="regime")return `<label class="field" style="grid-column:1/-1"><span class="label">${l}</span><select id="${id}" data-c="${k}"><option value="nao_optante" ${(cfg[k]||"nao_optante")==="nao_optante"?"selected":""}>Não optante pelo crédito outorgado — art. 2º-B (ex.: autopeças 65,29%)</option><option value="optante" ${cfg[k]==="optante"?"selected":""}>Optante crédito outorgado ou Simples — Anexo Único (ex.: autopeças 50,39%, crédito limitado a 7%)</option><option value="atacadista" ${cfg[k]==="atacadista"?"selected":""}>Atacadista do art. 2º-A — MVA do Anexo Único com redução de 50%</option></select></label>`;
     if(t==="modulo")return `<label class="field" style="grid-column:1/-1"><span class="label">${l}</span><select id="${id}" data-c="${k}"><option value="st_mt" ${cfg[k]!=="antecipacao_ba"?"selected":""}>ICMS-ST / antecipação com MVA — MT (Portaria 195/2019)</option><option value="antecipacao_ba" ${cfg[k]==="antecipacao_ba"?"selected":""}>ICMS antecipação parcial — BA (Lei 7.014/96, art. 12-A)</option></select></label>`;
+    if(t==="pisreg")return `<label class="field"><span class="label">${l}</span><select id="${id}" data-c="${k}"><option value="">— informe —</option><option value="nao_cumulativo" ${cfg[k]==="nao_cumulativo"?"selected":""}>Lucro Real — não cumulativo</option><option value="cumulativo" ${cfg[k]==="cumulativo"?"selected":""}>Lucro Presumido/Arbitrado — cumulativo</option><option value="simples" ${cfg[k]==="simples"?"selected":""}>Simples Nacional</option></select></label>`;
     if(t==="venc")return `<label class="field"><span class="label">${l}</span><select id="${id}" data-c="${k}"><option value="hoje" ${cfg[k]==="hoje"?"selected":""}>No ato (data de hoje)</option><option value="dia" ${cfg[k]==="dia"?"selected":""}>Dia fixo do mês seguinte</option></select></label>`;
     return `<label class="field"><span class="label">${l}</span><input id="${id}" data-c="${k}" value="${esc(cfg[k])}"></label>`}).join("");
 }
@@ -1601,6 +1639,252 @@ async function novaEmpresa(){ const id="empresa-"+Date.now().toString(36); empre
   if(dbReady){try{await db.doc("config/"+id).set(cfg)}catch(e){toast("Só neste navegador: "+(e.code||e.message))}} renderEmpSel(); renderCfg(); renderAll(); setTab("config"); toast("Preencha os dados da nova empresa") }
 
 $("#btnNovaEmp").addEventListener("click",novaEmpresa);
+/* =====================================================================
+   MÓDULO CRÉDITO PRESUMIDO DE CBS SOBRE ESTOQUE — LC 214/2025, art. 381
+   Transição PIS/Cofins -> CBS. Estoque existente em 1º/01/2027.
+   ===================================================================== */
+const CBS_PCT=9.25;
+const CBS_LEI={
+  caput:"LC 214/2025, art. 381, caput: o contribuinte sujeito ao regime regular da CBS pode apropriar crédito presumido sobre o estoque de bens materiais existente em 1º/01/2027.",
+  I:"Art. 381, I: contribuinte que em 31/12/2026 estava no regime cumulativo de PIS/Cofins (Lei 9.718/98) — bens em estoque sem crédito de PIS/Cofins por causa desse regime.",
+  II:"Art. 381, II: bens em estoque sujeitos, na aquisição, à substituição tributária ou à incidência monofásica (Lei 10.147/2000 art. 1º I; Lei 10.485/2002 art. 1º caput, art. 3º II e art. 5º caput; MP 2.158-35 art. 43; Lei 9.532/97 art. 53; Lei 12.402/2011 art. 6º II).",
+  III:"Art. 381, III: parcela do valor sujeita à vedação parcial de crédito dos §§ 7º a 9º do art. 3º das Leis 10.637/2002 e 10.833/2003.",
+  p1I:"Art. 381, § 1º, I: só bens NOVOS adquiridos de pessoa jurídica no País ou importados, para revenda ou para produção/prestação de serviço.",
+  p1II:"Art. 381, § 1º, II: não se aplica a produtos cuja aquisição teve alíquota zero, isenção, suspensão ou não incidência de PIS/Cofins.",
+  p1III:"Art. 381, § 1º, III: não se aplica a bens de uso e consumo pessoal (art. 57).",
+  p1IV:"Art. 381, § 1º, IV: não se aplica a bens do ativo imobilizado nem a imóveis.",
+  p3:"Art. 381, § 3º: 9,25% sobre o valor do estoque (bens nacionais); importados = PIS/Cofins-Importação efetivamente pagos (sem o adicional do § 21 do art. 8º da Lei 10.865/2004).",
+  p4:"Art. 381, § 4º: apurar e apropriar até o último dia de junho/2027; usar em 12 parcelas mensais iguais e sucessivas a partir do período seguinte ao da apropriação; só compensa com CBS (vedados outros tributos e ressarcimento).",
+  p2:"Art. 381, § 2º: ato do Poder Executivo da União disciplinará a verificação do estoque (inventário e valoração ou método alternativo) — acompanhar a regulamentação.",
+  a383:"Art. 383: o direito de usar o crédito se extingue em 5 anos contados do fim do período de apuração da apropriação."
+};
+/* Lei 10.485/2002 — incidência monofásica (texto vigente, Planalto) */
+const CBS_MONO=[
+  {lei:"Lei 10.485/2002, art. 1º caput (máquinas, implementos e veículos)",ncm:["7309","731029","76129012","842481","8429","84306990","8432","8433","8434","8435","8436","8437","8701","8702","8703","8704","8705","8706","87162000"]},
+  {lei:"Lei 10.485/2002, art. 5º caput (pneus e câmaras de ar)",ncm:["4011","4013"]},
+  {lei:"Lei 10.485/2002, art. 3º II — Anexo I (autopeças)",ncm:["40161010","40169990","6813","70071100","70072100","70091000","73201000","83012000","83023000","84073390","84073490","840820","840991","840999","841330","84139100","84148021","84148022","841520","84212300","84213100","84314100","84314200","84339090","84818099","848310","84832000","848330","848340","848350","850520","85071000","8511","851220","85123000","851240","85129000","85272","85365090","853910","85443000","870600","8707","8708","90292010","90299010","90303921","90318040","903289","91040000","94012000"],ex:{"40169990":"Ex 03 e 05","73201000":"Ex 01","84139100":"Ex 01","84818099":"Ex 01 e 02","85365090":"Ex 01"}},
+  {lei:"Lei 10.485/2002, art. 3º II — Anexo II (autopeças próprias para máquinas/veículos autopropulsados)",anexo2:true,ncm:["4009","84314","84089090","84122110","84122190","84123110","84136019","84148019","84149039","84329000","84811000","84812090","84818092","848360","85011019"]},
+  {lei:"Lei 10.147/2000, art. 1º I (farmacêuticos, perfumaria, higiene)",ncm:["3001","3003","3004","300210","300220","300290","30051010","300630","300660","3303","3304","3305","3306","3307","34011190","34012010","96032100"]}
+];
+function cbsMono(ncm){ncm=onlyDigits(ncm);let best=null;for(const g of CBS_MONO)for(const p of g.ncm)if(ncm.startsWith(p)&&(!best||p.length>best.p.length))best={...g,p};return best}
+const CBS_REG={nao_cumulativo:"Lucro Real — PIS/Cofins não cumulativo",cumulativo:"Lucro Presumido/Arbitrado — PIS/Cofins cumulativo",simples:"Simples Nacional"};
+function cbsRegime(){return cfg.regimePisCofins||""}
+
+/* ---------- índice de compras (XMLs) ---------- */
+function parseCompraItens(xmlText){
+  const doc=new DOMParser().parseFromString(xmlText,"application/xml");
+  const inf=q(doc,"infNFe"); if(!inf) return null;
+  const ide=q(inf,"ide"),emit=q(inf,"emit"),dest=q(inf,"dest"),ee=q(emit,"enderEmit");
+  const chave=(inf.getAttribute("Id")||"").replace(/^NFe/,"")||tx(doc,"chNFe");
+  const nota={chave,nNF:tx(ide,"nNF"),dhEmi:(tx(ide,"dhEmi")||tx(ide,"dEmi")).slice(0,10),tpNF:tx(ide,"tpNF"),finNFe:tx(ide,"finNFe"),
+    emitCnpj:tx(emit,"CNPJ"),emitCpf:tx(emit,"CPF"),emitNome:tx(emit,"xNome"),emitUF:tx(ee,"UF"),destDoc:tx(dest,"CNPJ")||tx(dest,"CPF")};
+  const grp=(imp,tag)=>{const g=q(imp,tag);const c=g?[...g.children][0]:null;return c?{cst:tx(c,"CST"),v:num(tx(c,"v"+tag)),p:num(tx(c,"p"+tag)),grupo:c.localName}:{cst:"",v:0,p:0,grupo:""}};
+  const itens=[...inf.getElementsByTagNameNS("*","det")].map(det=>{const p=q(det,"prod"),imp=q(det,"imposto");const pis=grp(imp,"PIS"),cof=grp(imp,"COFINS");
+    return {nItem:det.getAttribute("nItem"),cProd:tx(p,"cProd"),cEAN:tx(p,"cEAN"),xProd:tx(p,"xProd"),ncm:tx(p,"NCM"),cfop:tx(p,"CFOP"),qCom:num(tx(p,"qCom")),vProd:num(tx(p,"vProd")),
+      cstPIS:pis.cst,pPIS:pis.p,vPIS:pis.v,cstCOF:cof.cst,pCOF:cof.p,vCOF:cof.v,ii:num(tx(q(imp,"II"),"vII"))}});
+  return {...nota,itens};
+}
+let CBS_IDX=lsGet("cbs_idx_v1",{}); // empId -> {chave: nota}
+function cbsIdx(){return CBS_IDX[empId]||(CBS_IDX[empId]={})}
+function cbsSaveIdx(){lsSet("cbs_idx_v1",CBS_IDX)}
+function cbsAddXml(xml,origem){const n=parseCompraItens(xml); if(!n) return {ok:false,msg:"não é NF-e"};
+  const r=rootOf(cfg.cnpj); const entrada=rootOf(n.destDoc)===r, importacao=rootOf(n.emitCnpj)===r&&n.tpNF==="0";
+  if(!entrada&&!importacao) return {ok:false,msg:"NF não é de compra desta empresa"};
+  n.importacao=importacao; n.origem=origem; cbsIdx()[n.chave||n.nNF+"-"+n.emitCnpj]=n; return {ok:true,n} }
+async function cbsSyncNotas(force){ // usa as NF-e já importadas no sistema (XML guardado)
+  let add=0,falta=0;
+  for(const n of notesAtivas()){ const k=n.chave||n.id; if(!force&&cbsIdx()[k]) continue;
+    const xml=await getXml(n.id); if(!xml){falta++;continue}
+    const r=cbsAddXml(xml,"sistema"); if(r.ok) add++; }
+  cbsSaveIdx(); return {add,falta} }
+function cbsCompras(){ // lista plana de itens comprados, mais recente primeiro
+  const L=[]; Object.values(cbsIdx()).forEach(n=>n.itens.forEach(it=>L.push({...it,nota:n})));
+  return L.sort((a,b)=>(b.nota.dhEmi||"").localeCompare(a.nota.dhEmi||"")) }
+
+/* ---------- inventário (planilha do ERP) ---------- */
+let CBS_INV=lsGet("cbs_inv_v1",{}); // empId -> {arquivo,data,linhas:[...],map}
+function cbsInv(){return CBS_INV[empId]||null}
+const CBS_COLS=[["cod","Código do produto (ERP)",/^(c[oó]d|codigo|c[oó]digo|produto|item|sku|refer)/i],["ref","Código do fornecedor / referência",/(fornec|fabric|refer[eê]ncia|part.?number|cod.*forn)/i],
+  ["ean","EAN / GTIN",/(ean|gtin|barra)/i],["desc","Descrição",/(descr|nome|produto)/i],["ncm","NCM",/ncm/i],["qtd","Quantidade",/(qtd|quant|saldo|estoque)/i],
+  ["custo","Custo unitário",/(unit|m[eé]dio|custo un|vl.? ?unit)/i],["valor","Valor total do estoque",/(total|valor|custo total|vl.? ?total)/i],["situacao","Situação (novo/usado)",/(situa|novo|usado|estado)/i],
+  ["destino","Destinação (revenda/insumo/uso/imobilizado)",/(destin|finalid|tipo)/i]];
+function cbsAutoMap(hdr){const map={},usados=new Set();
+  for(const [k,,re] of CBS_COLS){const i=hdr.findIndex((h,ix)=>!usados.has(ix)&&re.test(String(h||"")));if(i>=0){map[k]=i;usados.add(i)}}
+  return map}
+function cbsLerPlanilha(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>{try{
+  const wb=XLSX.read(fr.result,{type:"array"});const ws=wb.Sheets[wb.SheetNames[0]];const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+  let h=0;for(let i=0;i<Math.min(15,aoa.length);i++){const row=aoa[i].map(String);if(row.some(c=>/ncm/i.test(c))&&row.filter(Boolean).length>=3){h=i;break}}
+  res({hdr:aoa[h].map(String),rows:aoa.slice(h+1).filter(r=>r.some(c=>String(c).trim()!==""))})}catch(e){rej(e)}};fr.onerror=rej;fr.readAsArrayBuffer(file)})}
+function cbsMontarLinhas(hdr,rows,map){
+  return rows.map((r,i)=>{const g=k=>map[k]!=null?r[map[k]]:"";const qtd=num(g("qtd")),custo=num(g("custo"));let valor=num(g("valor"));if(!valor&&qtd&&custo)valor=qtd*custo;
+    return {i:i+1,cod:String(g("cod")).trim(),ref:String(g("ref")).trim(),ean:onlyDigits(g("ean")),desc:String(g("desc")).trim(),ncm:onlyDigits(g("ncm")),qtd,custo:custo||(qtd?valor/qtd:0),valor:r2(valor),
+      situacao:String(g("situacao")).trim(),destino:String(g("destino")).trim()}}).filter(l=>l.cod||l.desc||l.ncm)}
+
+/* ---------- vínculo estoque x NF de compra ---------- */
+const cbsTok=s=>new Set(String(s||"").toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g,"").split(/[^A-Z0-9]+/).filter(w=>w.length>2));
+function cbsSim(a,b){const A=cbsTok(a),B=cbsTok(b);if(!A.size||!B.size)return 0;let c=0;A.forEach(w=>{if(B.has(w))c++});return c/Math.min(A.size,B.size)}
+function cbsVincular(l,compras){
+  const nc=s=>String(s||"").trim().toUpperCase().replace(/^0+/,"");
+  const by=(f,how)=>{const it=compras.find(f);return it?{it,how}:null};
+  return (l.ean&&l.ean.length>=8&&by(c=>onlyDigits(c.cEAN)===l.ean,"EAN"))
+    ||(l.ref&&by(c=>nc(c.cProd)===nc(l.ref),"código do fornecedor"))
+    ||(l.cod&&by(c=>nc(c.cProd)===nc(l.cod),"código igual ao da NF"))
+    ||(l.ncm&&(()=>{let best=null;for(const c of compras){if(onlyDigits(c.ncm)!==l.ncm)continue;const s=cbsSim(l.desc,c.xProd);if(s>=0.6&&(!best||s>best.s))best={it:c,s}}return best?{it:best.it,how:`NCM + descrição (${Math.round(best.s*100)}%)`}:null})())
+    ||null}
+
+/* ---------- regra de elegibilidade ---------- */
+function cbsAvaliar(l,v,regime){
+  const out={hip:"",status:"conf",motivos:[],credito:0,base:l.valor,lei:[]};
+  const it=v&&v.it, n=it&&it.nota, cst=it?String(it.cstPIS||"").padStart(2,"0"):"", mono=cbsMono(l.ncm||(it&&it.ncm));
+  const no=(m,lei)=>{out.status="nao";out.motivos.push(m);if(lei)out.lei.push(lei);return out};
+  if(!regime) {out.motivos.push("Informe o regime de PIS/Cofins da empresa em 31/12/2026 (aba Empresa).");return out}
+  if(/usad|semi/i.test(l.situacao)) return no("Bem usado — o crédito só alcança bens novos.","p1I");
+  if(/imobiliz|ativo/i.test(l.destino)) return no("Destinação ativo imobilizado.","p1IV");
+  if(/uso|consumo/i.test(l.destino)) return no("Destinação uso e consumo — não é revenda nem insumo.","p1III");
+  if(!(l.valor>0)) {out.motivos.push("Linha sem valor de estoque.");return out}
+  if(n&&!n.importacao&&(n.emitCpf||onlyDigits(n.emitCnpj).length!==14)) return no("Fornecedor pessoa física — só dá crédito bem adquirido de pessoa jurídica.","p1I");
+  if(it&&/^[56]551$|^[56]552$|^[56]553$/.test(it.cfop)) return no(`CFOP ${it.cfop} do fornecedor indica venda de ativo imobilizado (bem usado).`,"p1I");
+  if(it&&/^[56](910|911|949)$/.test(it.cfop)&&["06","07","08","09","49","70","71","72","73","74","75","98","99"].includes(cst)) out.motivos.push(`CFOP ${it.cfop}: bonificação/remessa — confirme se houve aquisição onerosa.`);
+  if(n&&n.importacao){const vImp=r2((it.vPIS||0)+(it.vCOF||0));const frac=it.qCom&&l.qtd?Math.min(1,l.qtd/it.qCom):1;
+    out.hip=regime==="cumulativo"?"I":"II";out.status=vImp>0?"ok":"conf";out.credito=r2(vImp*frac);out.base=l.valor;out.lei.push("p3");
+    out.motivos.push(vImp>0?`Importado: crédito = PIS/Cofins-Importação pagos na DI (${fmt(vImp)} na NF ${n.nNF}${frac<1?`, proporcional a ${l.qtd} de ${it.qCom}`:""}). Não usar o adicional de alíquota.`:"Importado: informe os valores de PIS/Cofins-Importação pagos (não constam na NF de entrada).");
+    if(regime==="nao_cumulativo"&&!mono){out.status="nao";out.credito=0;out.motivos=["Lucro Real e item importado sem incidência monofásica: o PIS/Cofins-Importação já gerou crédito."]}
+    return out}
+  if(["06","07","08","09"].includes(cst)) return no(`A NF de compra veio com CST PIS ${cst} (${{"06":"alíquota zero","07":"isenta","08":"sem incidência","09":"suspensão"}[cst]}).`,"p1II");
+  if(cst==="04"){out.status="conf";out.hip="II";out.lei.push("II","p1II");
+    out.motivos.push(`Comprado de revendedor com CST 04 (monofásico revenda a alíquota zero). O inciso II alcança bens "sujeitos, na aquisição, à incidência monofásica", mas o § 1º, II exclui aquisição "contemplada por alíquota zero". Ponto em aberto até a regulamentação — prudente não apropriar sem parecer.`);
+    out.credito=r2(l.valor*CBS_PCT/100);return out}
+  if(cst==="05"){out.hip="II";out.status="ok";out.lei.push("II");out.motivos.push("Adquirido com substituição tributária de PIS/Cofins (CST 05).");out.credito=r2(l.valor*CBS_PCT/100);return out}
+  if(cst==="02"||cst==="03"){
+    if(mono){out.hip="II";out.status=mono.anexo2?"conf":"ok";out.lei.push("II");out.motivos.push(`Monofásico na aquisição (CST ${cst}, PIS ${pct(it.pPIS)}/Cofins ${pct(it.pCOF)}) — ${mono.lei}, posição ${mono.p}${mono.ex&&mono.ex[mono.p]?" ("+mono.ex[mono.p]+": confirmar o Ex)":""}.`);
+      if(mono.anexo2) out.motivos.push("Item do Anexo II: só é monofásico se for próprio para máquina/veículo autopropulsado listado — confirmar a aplicação.");
+      out.credito=r2(l.valor*CBS_PCT/100);return out}
+    out.hip="II";out.status="conf";out.lei.push("II");out.motivos.push(`NF com CST ${cst} (alíquota diferenciada), mas o NCM ${l.ncm||it.ncm} não está nas listas monofásicas carregadas — confirmar a lei que fundamenta.`);out.credito=r2(l.valor*CBS_PCT/100);return out}
+  // CST 01 / 49 / 99 / sem NF
+  if(regime==="cumulativo"){out.hip="I";out.lei.push("I");
+    if(!it){out.status="conf";out.motivos.push("Sem NF de compra vinculada: elegível se a NF provar compra de pessoa jurídica com PIS/Cofins tributado (não alíquota zero/isenção/suspensão).");out.credito=r2(l.valor*CBS_PCT/100);return out}
+    if(["49","99"].includes(cst)){out.status="conf";out.motivos.push(`CST ${cst} ("outras operações") na NF de compra — confirmar se houve incidência de PIS/Cofins.`);out.credito=r2(l.valor*CBS_PCT/100);return out}
+    out.status="ok";out.motivos.push(`Empresa no regime cumulativo em 31/12/2026: o bem não gerou crédito de PIS/Cofins na compra (NF ${n.nNF}, CST ${cst||"—"}).`);out.credito=r2(l.valor*CBS_PCT/100);return out}
+  if(regime==="simples"){out.status=mono?"conf":"nao";out.motivos.push(mono?"Simples Nacional: só teria direito se optar pelo regime regular da CBS em 2027 e o item for monofásico na aquisição.":"Simples Nacional não está no regime cumulativo da Lei 9.718 — sem direito pelo inciso I.");if(mono){out.hip="II";out.credito=r2(l.valor*CBS_PCT/100)}return out}
+  // não cumulativo
+  if(mono){out.hip="II";out.lei.push("II");out.status="conf";
+    out.motivos.push(it?`NCM monofásico (${mono.lei}), mas a NF de compra veio com CST ${cst||"—"} (tributação normal). Se a compra foi do fabricante/importador o correto seria CST 02 — conferir com o fornecedor.`:`Sem NF vinculada; NCM monofásico (${mono.lei}). Elegível se a compra foi do fabricante/importador (NF com CST 02).`);
+    out.credito=r2(l.valor*CBS_PCT/100);return out}
+  return no(it?`Lucro Real com compra tributada normalmente (CST ${cst||"—"}): o PIS/Cofins já foi creditado na aquisição — fora dos incisos do art. 381.`:"Lucro Real: NCM fora das listas monofásicas e sem NF vinculada — não elegível.","II");
+}
+
+let CBS_DEC=lsGet("cbs_dec_v1",{});
+function cbsDec(){return CBS_DEC[empId]||(CBS_DEC[empId]={})}
+function cbsDecidir(cod,status){const u=(window.__siteUser&&window.__siteUser.email)||"usuário local";if(status)cbsDec()[cod]={status,por:u,em:new Date().toISOString().slice(0,16).replace("T"," ")};else delete cbsDec()[cod];lsSet("cbs_dec_v1",CBS_DEC);renderCBS()}
+/* ---------- apuração ---------- */
+function cbsCalcular(){
+  const inv=cbsInv(); if(!inv) return null; const compras=cbsCompras(), regime=cbsRegime();
+  const D=cbsDec();
+  const linhas=inv.linhas.map(l=>{const v=cbsVincular(l,compras);const a=cbsAvaliar(l,v,regime);const d=D[l.cod||("#"+l.i)];
+    if(d&&a.status!=="nao"||d&&d.status==="nao"){a.auto=a.status;a.dec=d;a.status=d.status;if(d.status==="ok"&&!a.credito)a.credito=r2(l.valor*CBS_PCT/100);a.motivos.push(`Decisão manual: ${d.status==="ok"?"confirmado elegível":"marcado não elegível"} por ${d.por} em ${d.em}.`)}
+    return {l,v,a}});
+  const soma=f=>r2(linhas.filter(f).reduce((s,x)=>s+x.a.credito,0)), somaV=f=>r2(linhas.filter(f).reduce((s,x)=>s+x.l.valor,0));
+  return {linhas,regime,tot:{valor:somaV(()=>true),valorOk:somaV(x=>x.a.status==="ok"),ok:soma(x=>x.a.status==="ok"),conf:soma(x=>x.a.status==="conf"),
+    nOk:linhas.filter(x=>x.a.status==="ok").length,nConf:linhas.filter(x=>x.a.status==="conf").length,nNao:linhas.filter(x=>x.a.status==="nao").length,semNF:linhas.filter(x=>!x.v).length}};
+}
+function cbsParcelas(total,mesAprop){ // mesAprop "2027-06"
+  const [y,m]=mesAprop.split("-").map(Number);const p=r2(total/12);const out=[];let acc=0;
+  for(let i=1;i<=12;i++){const d=new Date(y,m-1+i,1);const v=i<12?p:r2(total-acc);acc=r2(acc+v);out.push({n:i,mes:String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(),valor:v})}
+  return out}
+
+/* ---------- tela ---------- */
+let CBS_FILTRO=lsGet("cbs_filtro","todos"), CBS_RES=null;
+const CBS_ST={ok:["ok","Elegível"],conf:["warn","Conferir"],nao:["bad","Não elegível"]};
+function renderCBS(){
+  const host=$("#cbsBody"); if(!host) return;
+  const reg=cbsRegime(), inv=cbsInv(), nIdx=Object.keys(cbsIdx()).length;
+  $("#cbsReg").value=reg; $("#cbsAprop").value=cfg.cbsAprop||"2027-06";
+  $("#cbsStatus").innerHTML=`<span class="pill ${reg?"ok":"bad"}">${reg?esc(CBS_REG[reg]):"regime não informado"}</span> <span class="pill ${inv?"ok":"warn"}">${inv?`inventário: ${inv.linhas.length} itens · ${esc(inv.arquivo)}`:"sem inventário"}</span> <span class="pill ${nIdx?"ok":"warn"}">NF de compra indexadas: ${nIdx}</span>`;
+  const R=CBS_RES=cbsCalcular();
+  if(!R){host.innerHTML=`<div class="empty" style="padding:24px">Importe a planilha de estoque de 31/12/2026 (exportada do ERP) para validar item a item. Colunas mínimas: código, descrição, NCM, quantidade e custo (unitário ou total).</div>`;$("#cCbs").textContent="";return}
+  const parc=cbsParcelas(R.tot.ok,cfg.cbsAprop||"2027-06");
+  $("#cCbs").textContent=R.tot.nConf||"";
+  const rows=R.linhas.filter(x=>CBS_FILTRO==="todos"||x.a.status===CBS_FILTRO||(CBS_FILTRO==="semnf"&&!x.v));
+  host.innerHTML=`
+  <div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">
+    <div class="note-card"><div><div class="muted" style="font-size:12px">Valor do estoque</div><b>R$ ${fmt(R.tot.valor)}</b><div class="faint" style="font-size:12px">${R.linhas.length} itens</div></div></div>
+    <div class="note-card"><div><div class="muted" style="font-size:12px">Crédito elegível (9,25%)</div><b style="color:var(--ok,#167a3e)">R$ ${fmt(R.tot.ok)}</b><div class="faint" style="font-size:12px">${R.tot.nOk} itens · base R$ ${fmt(R.tot.valorOk)}</div></div></div>
+    <div class="note-card"><div><div class="muted" style="font-size:12px">Em conferência</div><b>R$ ${fmt(R.tot.conf)}</b><div class="faint" style="font-size:12px">${R.tot.nConf} itens — não somados</div></div></div>
+    <div class="note-card"><div><div class="muted" style="font-size:12px">Não elegíveis</div><b>${R.tot.nNao} itens</b><div class="faint" style="font-size:12px">${R.tot.semNF} sem NF de compra vinculada</div></div></div>
+    <div class="note-card"><div><div class="muted" style="font-size:12px">Parcela mensal (12x)</div><b>R$ ${fmt(parc[0].valor)}</b><div class="faint" style="font-size:12px">${parc[0].mes} a ${parc[11].mes} · só contra CBS</div></div></div>
+  </div>
+  <div class="row" style="gap:8px;flex-wrap:wrap">${[["todos","Todos"],["ok","Elegíveis"],["conf","Conferir"],["nao","Não elegíveis"],["semnf","Sem NF vinculada"]].map(([k,t])=>`<button data-cbsf="${k}" class="${CBS_FILTRO===k?"":"ghost"}">${t}</button>`).join("")}
+    <span style="flex:1"></span><button id="cbsXls">Exportar Excel</button><button id="cbsPdf">Memória em PDF</button></div>
+  <div style="overflow:auto"><table><thead><tr><th>#</th><th>Código</th><th>Descrição</th><th>NCM</th><th class="num">Qtd</th><th class="num">Valor estoque</th><th>NF de compra</th><th>CST PIS</th><th>Inciso</th><th>Situação</th><th class="num">Crédito</th><th>Fundamento</th><th></th></tr></thead><tbody>
+  ${rows.slice(0,1500).map(({l,v,a})=>`<tr><td class="mono faint">${l.i}</td><td class="mono">${esc(l.cod)}</td><td>${esc(l.desc.slice(0,60))}</td><td class="mono">${esc(l.ncm)}</td><td class="num">${(l.qtd||0).toLocaleString("pt-BR")}</td><td class="num">${fmt(l.valor)}</td>
+    <td style="font-size:12px">${v?`NF ${esc(v.it.nota.nNF)} · ${brDate(v.it.nota.dhEmi)}<br><span class="faint">${esc((v.it.nota.emitNome||"").slice(0,26))} · ${esc(v.how)}</span>`:`<span class="faint">não vinculada</span>`}</td>
+    <td class="mono">${v?esc(v.it.cstPIS||"—"):"—"}</td><td class="mono">${esc(a.hip||"—")}</td><td><span class="pill ${CBS_ST[a.status][0]}">${CBS_ST[a.status][1]}</span></td>
+    <td class="num">${a.status==="nao"?"—":fmt(a.credito)}</td><td style="font-size:12px;max-width:420px">${esc(a.motivos.join(" "))}</td>
+    <td style="white-space:nowrap">${a.dec?`<button class="ghost" data-cbsd="" data-cod="${esc(l.cod||"#"+l.i)}" title="Desfazer decisão manual">desfazer</button>`:a.status==="conf"?`<button data-cbsd="ok" data-cod="${esc(l.cod||"#"+l.i)}">Confirmar</button> <button class="ghost danger" data-cbsd="nao" data-cod="${esc(l.cod||"#"+l.i)}">Recusar</button>`:""}</td></tr>`).join("")||`<tr><td class="empty" colspan="13">Nenhum item neste filtro.</td></tr>`}
+  </tbody></table>${rows.length>1500?`<div class="muted">Mostrando 1.500 de ${rows.length} — o Excel traz todos.</div>`:""}</div>
+  <details><summary><b>Parcelas de utilização</b> (apropriação em ${esc((cfg.cbsAprop||"2027-06").split("-").reverse().join("/"))})</summary>
+    <table style="max-width:420px"><thead><tr><th>Parcela</th><th>Mês</th><th class="num">Valor</th></tr></thead><tbody>${parc.map(p=>`<tr><td>${p.n}/12</td><td class="mono">${p.mes}</td><td class="num">${fmt(p.valor)}</td></tr>`).join("")}</tbody></table></details>`;
+}
+function cbsMapUI(hdr,map,onOk){
+  const box=$("#cbsMap");box.hidden=false;
+  box.innerHTML=`<div class="callout info">Confira de qual coluna da planilha vem cada informação e clique em Aplicar.</div><div class="grid-form">${CBS_COLS.map(([k,t])=>`<label class="field"><span class="label">${t}</span><select data-cm="${k}"><option value="">—</option>${hdr.map((h,i)=>`<option value="${i}" ${map[k]===i?"selected":""}>${esc(h||"(coluna "+(i+1)+")")}</option>`).join("")}</select></label>`).join("")}</div><div class="row"><button id="cbsMapOk">Aplicar</button><button class="ghost" id="cbsMapCancel">Cancelar</button></div>`;
+  $("#cbsMapOk").onclick=()=>{const m={};$$("[data-cm]").forEach(s=>{if(s.value!=="")m[s.dataset.cm]=+s.value});if(m.ncm==null||(m.valor==null&&(m.qtd==null||m.custo==null))){toast("Informe ao menos NCM e valor (ou quantidade + custo unitário)");return}box.hidden=true;onOk(m)};
+  $("#cbsMapCancel").onclick=()=>{box.hidden=true};
+}
+async function cbsImportInv(file){
+  try{const {hdr,rows}=await cbsLerPlanilha(file);const map=cbsAutoMap(hdr);
+    cbsMapUI(hdr,map,m=>{const linhas=cbsMontarLinhas(hdr,rows,m);CBS_INV[empId]={arquivo:file.name,data:todayISO(),linhas,map:m,hdr};lsSet("cbs_inv_v1",CBS_INV);toast(linhas.length+" itens de estoque importados");renderCBS()});
+  }catch(e){toast("Não consegui ler a planilha: "+e.message)}
+}
+async function cbsImportXmls(files){let ok=0,ign=0;
+  for(const f of files){try{const t=await f.text();const r=cbsAddXml(t,"credito");if(r.ok)ok++;else ign++}catch(e){ign++}}
+  cbsSaveIdx();toast(`${ok} NF de compra indexadas${ign?`, ${ign} ignoradas (não são compras desta empresa)`:""}`);renderCBS()}
+function cbsModelo(){const aoa=[["Código","Código fornecedor","EAN","Descrição","NCM","Quantidade","Custo unitário","Valor total","Situação","Destinação"],["10025","47818798","7895823940250","BARRA CENTRAL DA PLATAFORMA","84339090",2,605.17,1210.34,"novo","revenda"]];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),"Estoque 31-12-2026");XLSX.writeFile(wb,"modelo-estoque-credito-CBS.xlsx")}
+function cbsExcel(){const R=CBS_RES;if(!R){toast("Importe o inventário primeiro");return}
+  const wb=XLSX.utils.book_new(), parc=cbsParcelas(R.tot.ok,cfg.cbsAprop||"2027-06");
+  const res=[["Crédito presumido de CBS sobre estoque — LC 214/2025, art. 381"],["Empresa",cfg.razao||"",fmtCnpj(cfg.cnpj)],["Regime PIS/Cofins em 31/12/2026",CBS_REG[R.regime]||"não informado"],["Data do estoque","01/01/2027"],[],
+    ["Valor total do estoque",R.tot.valor],["Base elegível",R.tot.valorOk],["Crédito elegível (9,25%)",R.tot.ok],["Itens elegíveis",R.tot.nOk],["Itens em conferência (crédito não somado)",R.tot.nConf,R.tot.conf],["Itens não elegíveis",R.tot.nNao],[],
+    ["Fundamentação"],...Object.values(CBS_LEI).map(t=>[t])];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(res),"Resumo");
+  const it=[["#","Código","Cód. fornecedor","EAN","Descrição","NCM","Qtd","Custo unit.","Valor estoque","Vínculo","NF compra","Data NF","Fornecedor","CNPJ fornecedor","UF","CFOP","CST PIS","CST Cofins","% PIS","% Cofins","Inciso","Situação","Crédito","Fundamento","Decisão manual"]];
+  R.linhas.forEach(({l,v,a})=>{const x=v&&v.it,n=x&&x.nota;it.push([l.i,l.cod,l.ref,l.ean,l.desc,l.ncm,l.qtd,l.custo,l.valor,v?v.how:"",n?n.nNF:"",n?brDate(n.dhEmi):"",n?n.emitNome:"",n?fmtCnpj(n.emitCnpj||n.emitCpf):"",n?n.emitUF:"",x?x.cfop:"",x?x.cstPIS:"",x?x.cstCOF:"",x?x.pPIS:"",x?x.pCOF:"",a.hip,CBS_ST[a.status][1],a.status==="nao"?0:a.credito,a.motivos.join(" "),a.dec?`${a.dec.por} ${a.dec.em}`:""])});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(it),"Itens");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Parcela","Mês de utilização","Valor"],...parc.map(p=>[p.n+"/12",p.mes,p.valor])]),"Parcelas");
+  XLSX.writeFile(wb,`credito-CBS-estoque-${onlyDigits(cfg.cnpj)}.xlsx`)}
+function cbsPDF(){const R=CBS_RES;if(!R){toast("Importe o inventário primeiro");return}
+  if(!window.jspdf||!window.jspdf.jsPDF){toast("Gerador de PDF não carregou — recarregue a página");return}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});const M=12;let y=14;
+  doc.setFontSize(13);doc.text(pdfTxt("Memória — crédito presumido de CBS sobre estoque (LC 214/2025, art. 381)"),M,y);y+=6;doc.setFontSize(9);
+  doc.text(pdfTxt(`${cfg.razao||""} — CNPJ ${fmtCnpj(cfg.cnpj)} — regime PIS/Cofins em 31/12/2026: ${CBS_REG[R.regime]||"não informado"} — estoque em 01/01/2027`),M,y);y+=5;
+  doc.text(pdfTxt(`Valor do estoque: R$ ${fmt(R.tot.valor)} | Base elegível: R$ ${fmt(R.tot.valorOk)} | Crédito (9,25%): R$ ${fmt(R.tot.ok)} | Em conferência: R$ ${fmt(R.tot.conf)} (${R.tot.nConf} itens, não somado)`),M,y);y+=4;
+  doc.autoTable({startY:y,margin:{left:M,right:M},styles:{fontSize:6.5,cellPadding:1},head:[["#","Código","Descrição","NCM","Valor","NF compra","CST PIS","Inciso","Situação","Crédito","Fundamento"]],
+    body:R.linhas.map(({l,v,a})=>[l.i,l.cod,pdfTxt(l.desc.slice(0,45)),l.ncm,fmt(l.valor),v?pdfTxt(`${v.it.nota.nNF} ${brDate(v.it.nota.dhEmi)}`):"-",v?v.it.cstPIS:"-",a.hip||"-",CBS_ST[a.status][1],a.status==="nao"?"-":fmt(a.credito),pdfTxt(a.motivos.join(" ").slice(0,220))]),columnStyles:{10:{cellWidth:95}}});
+  y=doc.lastAutoTable.finalY+6;if(y>170){doc.addPage();y=14}
+  doc.setFontSize(8);Object.values(CBS_LEI).forEach(t=>{const L=doc.splitTextToSize(pdfTxt(t),270);if(y+L.length*3.5>200){doc.addPage();y=14}doc.text(L,M,y);y+=L.length*3.5+1});
+  doc.save(`memoria-credito-CBS-${onlyDigits(cfg.cnpj)}.pdf`)}
+function cbsConsulta(){
+  const ncm=onlyDigits($("#cbsQNcm").value),cst=$("#cbsQCst").value,forn=$("#cbsQForn").value,dest=$("#cbsQDest").value,sit=$("#cbsQSit").value;
+  if(!ncm){$("#cbsQRes").innerHTML="";return}
+  const fake=cst||forn==="cpf"?{it:{ncm,cstPIS:cst,cfop:"6102",pPIS:cst==="02"?2.3:0,pCOF:cst==="02"?10.8:0,qCom:1,nota:{nNF:"(consulta)",emitCnpj:forn==="cpf"?"":"00000000000191",emitCpf:forn==="cpf"?"00000000191":"",importacao:forn==="imp"}},how:"consulta"}:null;
+  const a=cbsAvaliar({ncm,valor:100,qtd:1,situacao:sit,destino:dest,desc:""},fake,cbsRegime());const mono=cbsMono(ncm);
+  $("#cbsQRes").innerHTML=`<div class="note-card"><div><div class="row" style="gap:8px"><span class="pill ${CBS_ST[a.status][0]}">${CBS_ST[a.status][1]}</span><b>${a.hip?"Art. 381, inciso "+a.hip:"—"}</b>${mono?`<span class="pill acc">${esc(mono.lei)}</span>`:""}</div><div style="font-size:13px;margin-top:6px">${esc(a.motivos.join(" "))}</div><div class="faint" style="font-size:12px;margin-top:6px">${a.lei.map(k=>esc(CBS_LEI[k]||"")).join(" ")}</div>${a.status!=="nao"?`<div class="muted" style="font-size:12px;margin-top:6px">Crédito = 9,25% do valor do estoque (R$ 100,00 → R$ 9,25).</div>`:""}</div></div>`}
+function cbsInit(){
+  $("#cbsReg").addEventListener("change",async e=>{cfg.regimePisCofins=e.target.value;empresas[empId]={...cfg};lsSet("st_empresas",empresas);lsSet("st_cfg",cfg);renderCBS();cbsConsulta();renderCfg();
+    if(dbReady){try{await db.doc("config/"+empId).set(cfg)}catch(err){}}});
+  $("#cbsAprop").addEventListener("change",e=>{cfg.cbsAprop=e.target.value;empresas[empId]={...cfg};lsSet("st_empresas",empresas);lsSet("st_cfg",cfg);renderCBS()});
+  $("#cbsInvIn").addEventListener("change",e=>{const f=e.target.files[0];if(f)cbsImportInv(f);e.target.value=""});
+  $("#cbsXmlIn").addEventListener("change",e=>{cbsImportXmls([...e.target.files]);e.target.value=""});
+  $("#cbsSync").addEventListener("click",async()=>{toast("Lendo os XMLs das notas do sistema…");const r=await cbsSyncNotas(true);toast(`${r.add} NF indexadas${r.falta?`, ${r.falta} sem XML guardado`:""}`);renderCBS()});
+  $("#cbsModelo").addEventListener("click",cbsModelo);
+  $("#cbsLimpar").addEventListener("click",()=>{if(!cbsInv())return;delete CBS_INV[empId];lsSet("cbs_inv_v1",CBS_INV);renderCBS();toast("Inventário removido")});
+  $("#cbsBody").addEventListener("click",e=>{const dd=e.target.closest("[data-cbsd]");if(dd){cbsDecidir(dd.dataset.cod,dd.dataset.cbsd);return}const b=e.target.closest("[data-cbsf]");if(b){CBS_FILTRO=b.dataset.cbsf;lsSet("cbs_filtro",CBS_FILTRO);renderCBS();return}
+    if(e.target.id==="cbsXls")cbsExcel();if(e.target.id==="cbsPdf")cbsPDF()});
+  ["cbsQNcm","cbsQCst","cbsQForn","cbsQDest","cbsQSit"].forEach(id=>$("#"+id).addEventListener("input",cbsConsulta));
+  $("#tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b&&b.dataset.tab==="cbs"){renderCBS();if(!Object.keys(cbsIdx()).length)cbsSyncNotas(false).then(r=>{if(r.add)renderCBS()})}});
+}
+cbsInit();
+
 /* boot */
 {if(!/^\d{4}-\d{2}$/.test(apur)){const d=new Date();apur=shiftMes(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),-1);} $("#apurSel").value=apur; $("#apurAll").checked=apurTodas;}
 hist=lsGet("st_hist",{});
